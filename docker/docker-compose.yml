@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+    rm:
+        container_name: rm
+        build:
+            context: ../
+            dockerfile: docker/Dockerfile
+        ports:
+            - 8005:8005
+        env_file: 
+            - database.env
+        environment: 
+            POSTGRES_HOST: pgdb
+            POSTGRES_PORT: 5432
+            BASE_PATH: "/opt/data"
+            RK_HOST: "rk:8002"
+        volumes:
+            - ../repos:/opt/data
+        command: ["./wait-for-it.sh", "pgdb:5432", "--", "./main"]
+
+networks:
+    default:
+        external:
+            name: proxynet
