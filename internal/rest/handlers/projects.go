@@ -52,7 +52,8 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 	existingProject := p.db.GetProjectByIDAndCommit(projectID, commit)
 	if existingProject != nil && existingProject.Name != "" {
 		p.l.Info("Project with commit found", "id", existingProject.ProjectID, "name", existingProject.Name, "commit", existingProject.CommitHash, "zip", existingProject.ZippedPath)
-		rw.Header().Set("Content-type", "application/zip")
+		rw.Header().Set("Content-type", "application/octet-stream")
+		rw.Header().Set("Content-Disposition", "attachment; filename=\"" + existingProject.Name + ".bundle\"")
 		http.ServeFile(rw, r, existingProject.ZippedPath)
 		return
 	}
@@ -74,7 +75,8 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 		p.l.Debug("Save project - db", "id", projectID, "name", existingProject.Name)
 		p.db.AddProject(project)
 
-		rw.Header().Set("Content-type", "application/zip")
+		rw.Header().Set("Content-type", "application/octet-stream")
+		rw.Header().Set("Content-Disposition", "attachment; filename=\"" + project.Name + ".bundle\"")
 		http.ServeFile(rw, r, existingProject.ZippedPath)
 		return
 	}
@@ -101,13 +103,8 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	project = p.db.GetProjectByID(projectID)
-	if project != nil {
-		rw.Header().Set("Content-type", "application/zip")
-		http.ServeFile(rw, r, project.ZippedPath)
-		return
-	}
-	rw.Header().Set("Content-type", "application/zip")
+	rw.Header().Set("Content-type", "application/octet-stream")
+	rw.Header().Set("Content-Disposition", "attachment; filename=\"" + project.Name + ".bundle\"")
 	http.ServeFile(rw, r, project.ZippedPath)
 }
 

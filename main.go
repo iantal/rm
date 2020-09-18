@@ -71,7 +71,7 @@ func main() {
 
 	projectDB := repository.NewProjectDB(l, db)
 	projH := handlers.NewProjects(l, stor, projectDB, rkHost)
-	mw := handlers.GzipHandler{}
+	// mw := handlers.GzipHandler{}
 
 	// create a new serve mux and register the handlers
 	sm := mux.NewRouter()
@@ -80,7 +80,7 @@ func main() {
 
 	gh := sm.Methods(http.MethodGet).Subrouter()
 	gh.HandleFunc("/api/v1/projects/{id:[0-9a-f-]{36}}/{commit:[0-9a-f]{40}}/download", projH.Download)
-	gh.Use(mw.GzipMiddleware)
+	// gh.Use(mw.GzipMiddleware)
 
 	// create a new server
 	s := http.Server{
