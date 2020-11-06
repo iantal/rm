@@ -1,4 +1,3 @@
-[![GitHub license](https://img.shields.io/github/license/liamg/gitjacker)](https://github.com/liamg/gitjacker/blob/master/LICENSE)
 
 # rm
 RM - Repository Manager
