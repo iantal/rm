@@ -3,7 +3,9 @@ version: '3.8'
 services:
     rm:
         container_name: rm
-        image: micky0000/seclens:v1.0.2-rm
+        build:
+            context: ../
+            dockerfile: docker/Dockerfile
         ports:
             - 8005:8005
         env_file: 
