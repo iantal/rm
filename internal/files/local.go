@@ -6,14 +6,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 
+	"github.com/iantal/rm/internal/util"
 	"golang.org/x/xerrors"
 )
 
 // Local is an implementation of the Storage interface which works with the
 // local disk on the current machine
 type Local struct {
+	log         *util.StandardLogger
 	maxFileSize int // maximum numbber of bytes for files
 	basePath    string
 }
@@ -21,13 +22,13 @@ type Local struct {
 // NewLocal creates a new Local filesytem with the given base path
 // basePath is the base directory to save files to
 // maxSize is the max number of bytes that a file can be
-func NewLocal(basePath string, maxSize int) (*Local, error) {
+func NewLocal(l *util.StandardLogger, basePath string, maxSize int) (*Local, error) {
 	p, err := filepath.Abs(basePath)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Local{basePath: p}, nil
+	return &Local{l, maxSize, p}, nil
 }
 
 // Save the contents of the Writer to the given path
@@ -99,66 +100,26 @@ func (l *Local) Unzip(archive, target, name string) error {
 
 	cmd := exec.Command("unzip", "-qq", archive, "-d", td)
 
-	var waitStatus syscall.WaitStatus
 	if err := cmd.Run(); err != nil {
-		if err != nil {
-			os.Stderr.WriteString(fmt.Sprintf("Error: %s\n", err.Error()))
-		}
-		if exitError, ok := err.(*exec.ExitError); ok {
-			waitStatus = exitError.Sys().(syscall.WaitStatus)
-			fmt.Printf("Output: %s\n", []byte(fmt.Sprintf("%d", waitStatus.ExitStatus())))
-		}
-		return err
+		return xerrors.Errorf("Unable to unzip archive: %w", err)
 	}
 
-	waitStatus = cmd.ProcessState.Sys().(syscall.WaitStatus)
-
+	cmd.ProcessState.Sys()
 	return nil
 }
 
-// Zip uses the zip command line tool to compress the project to the specified target directory
-func (l *Local) Zip(src, dest, dir, name string) error {
+func (l *Local) Checkout(src, dest, commit, projectID, name string) error {
 	if err := os.MkdirAll(dest, 0755); err != nil {
 		return xerrors.Errorf("Unable to create target directory: %w", err)
 	}
 
-	archive := name + ".zip"
-
-	os.Chdir(filepath.Join(src, name))
-	cmd := exec.Command("zip", filepath.Join(dest, archive), "-r", dir)
-	os.Chdir("-")
-
-	var waitStatus syscall.WaitStatus
-	if err := cmd.Run(); err != nil {
-		if err != nil {
-			os.Stderr.WriteString(fmt.Sprintf("Error: %s\n", err.Error()))
-		}
-		if exitError, ok := err.(*exec.ExitError); ok {
-			waitStatus = exitError.Sys().(syscall.WaitStatus)
-			fmt.Printf("Output: %s\n", []byte(fmt.Sprintf("%d", waitStatus.ExitStatus())))
-		}
-		return err
-	}
-
-	waitStatus = cmd.ProcessState.Sys().(syscall.WaitStatus)
-
-	return nil
-}
-
-func (l *Local) Checkout(src, dest, commit, name string) error {
-	if err := os.MkdirAll(dest, 0755); err != nil {
-		return xerrors.Errorf("Unable to create target directory: %w", err)
-	}
-
-	fmt.Printf("Changing dir to %s\n", filepath.Join(src, name))
 	os.Chdir(filepath.Join(src, name))
 
 	// checkout the commit
 	cmd := exec.Command("git", "checkout", commit)
 	err := runCmd(cmd)
 	if err != nil {
-		fmt.Print("Checkout error")
-		return err
+		return xerrors.Errorf("Git checkout error: %w", err)
 	}
 
 	// bundle the commit
@@ -166,16 +127,14 @@ func (l *Local) Checkout(src, dest, commit, name string) error {
 	cmd = exec.Command("git", "bundle", "create", filepath.Join(dest, bf), "HEAD")
 	err = runCmd(cmd)
 	if err != nil {
-		fmt.Print("Bundle error")
-		return err
+		return xerrors.Errorf("Git bundle error: %w", err)
 	}
 
 	// reset
 	cmd = exec.Command("git", "reset", "--hard")
 	err = runCmd(cmd)
 	if err != nil {
-		fmt.Print("Reset error")
-		return err
+		return xerrors.Errorf("Git reset error: %w", err)
 	}
 
 	os.Chdir("-")
@@ -184,18 +143,16 @@ func (l *Local) Checkout(src, dest, commit, name string) error {
 }
 
 func runCmd(cmd *exec.Cmd) error {
-	var waitStatus syscall.WaitStatus
 	if err := cmd.Run(); err != nil {
 		if err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("Error: %s\n", err.Error()))
 		}
 		if exitError, ok := err.(*exec.ExitError); ok {
-			waitStatus = exitError.Sys().(syscall.WaitStatus)
-			fmt.Printf("Output checkout: %s\n", []byte(fmt.Sprintf("%d", waitStatus.ExitStatus())))
+			exitError.Sys()
 		}
 		return err
 	}
 
-	waitStatus = cmd.ProcessState.Sys().(syscall.WaitStatus)
+	cmd.ProcessState.Sys()
 	return nil
 }

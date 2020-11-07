@@ -2,19 +2,19 @@ package repository
 
 import (
 	"github.com/google/uuid"
-	"github.com/hashicorp/go-hclog"
 	"github.com/iantal/rm/internal/domain"
+	"github.com/iantal/rm/internal/util"
 	"github.com/jinzhu/gorm"
 )
 
 // ProjectDB defines the CRUD operations for storing projects in the db
 type ProjectDB struct {
-	log hclog.Logger
+	log *util.StandardLogger
 	db  *gorm.DB
 }
 
 // NewProjectDB returns a ProjectDB object for handling CRUD operations
-func NewProjectDB(log hclog.Logger, db *gorm.DB) *ProjectDB {
+func NewProjectDB(log *util.StandardLogger, db *gorm.DB) *ProjectDB {
 	db.AutoMigrate(&domain.Project{})
 	return &ProjectDB{
 		log: log,
