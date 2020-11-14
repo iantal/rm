@@ -68,10 +68,10 @@ func main() {
 
 	// create a new server
 	s := http.Server{
-		Addr:         ":8005",           // configure the bind address
-		Handler:      ch(sm),            // set the default handler
-		ReadTimeout:  5 * time.Second,   // max time to read request from the client
-		WriteTimeout: 10 * time.Second,  // max time to write response to the client
+		Addr:         ":8005",            // configure the bind address
+		Handler:      ch(sm),             // set the default handler
+		ReadTimeout:  5 * time.Second,    // max time to read request from the client
+		WriteTimeout: 1000 * time.Second, // max time to write response to the client
 		IdleTimeout:  1200 * time.Second, // max time for connections using TCP Keep-Alive
 	}
 
