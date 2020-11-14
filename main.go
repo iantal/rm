@@ -64,7 +64,6 @@ func main() {
 
 	gh := sm.Methods(http.MethodGet).Subrouter()
 	gh.HandleFunc("/api/v1/projects/{id:[0-9a-f-]{36}}/{commit:[0-9a-f]{40}}/download", projH.Download)
-	// gh.Use(mw.GzipMiddleware)
 
 	// create a new server
 	s := http.Server{
@@ -77,8 +76,7 @@ func main() {
 
 	// start the server
 	go func() {
-		logger.Info("Starting server bind_address ", ":8005")
-
+		logger.Info("Starting server bind_address :8005")
 		err := s.ListenAndServe()
 		if err != nil {
 			logger.WithField("error", err).Error("Unable to start server")
@@ -93,7 +91,7 @@ func main() {
 
 	// Block until a signal is received.
 	sig := <-c
-	logger.Info("Shutting down server with signal ", sig)
+	logger.WithField("signal", sig).Info("Shutting down server with signal")
 
 	// gracefully shutdown the server, waiting max 30 seconds for current operations to complete
 	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
