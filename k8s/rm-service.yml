@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rm-service
+spec:
+  selector:
+    app: rm
+  ports:
+    - protocol: TCP
+      port: 8005
+      targetPort: 8005

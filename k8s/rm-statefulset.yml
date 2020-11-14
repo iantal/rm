@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rm-sts
+  labels:
+    app: rm
+spec:
+  serviceName: rm-service
+  selector:
+    matchLabels:
+      app: rm
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: rm
+    spec:
+      imagePullSecrets: 
+        - name: dockerregistrykey
+      containers:
+        - name: rm
+          image: micky0000/seclens:v1.0.4-rm
+          imagePullPolicy: "Always"
+          ports:
+            - containerPort: 8005
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: rm-config
+                  key: postgres_user
+
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: rm-config
+                  key: postgres_host
+
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: rm-config
+                  key: postgres_port
+
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: rm-config
+                  key: postgres_db
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pgdb-postgresql
+                  key: postgresql-password
+
+          volumeMounts:
+            - name: rm-data
+              mountPath: /opt/data
+
+      volumes:
+        - name: rm-data
+          persistentVolumeClaim:
+            claimName: rm-claim

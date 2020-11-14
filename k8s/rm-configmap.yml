@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rm-config
+  labels:
+    app: rm
+data:
+  postgres_user: postgres
+  postgres_host: pgdb-postgresql
+  postgres_port: "5432"
+  postgres_db: rm_db
