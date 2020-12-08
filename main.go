@@ -69,9 +69,9 @@ func main() {
 	s := http.Server{
 		Addr:         ":8005",            // configure the bind address
 		Handler:      ch(sm),             // set the default handler
-		ReadTimeout:  5 * time.Second,    // max time to read request from the client
-		WriteTimeout: 1000 * time.Second, // max time to write response to the client
-		IdleTimeout:  1200 * time.Second, // max time for connections using TCP Keep-Alive
+		ReadTimeout:  50 * time.Second,    // max time to read request from the client
+		WriteTimeout: 10000 * time.Second, // max time to write response to the client
+		IdleTimeout:  12000 * time.Second, // max time for connections using TCP Keep-Alive
 	}
 
 	// start the server
