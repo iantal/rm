@@ -127,12 +127,35 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 			rw.WriteHeader(http.StatusInternalServerError)
 			util.ToJSON(&GenericError{Message: "Could not download project"}, rw)
 		}
-		rw.Header().Set("Content-type", "application/octet-stream")
-		rw.Header().Set("Content-Disposition", "attachment; filename=\""+project.Name+".bundle\"")
-		commitBundle := existingProject.Name + ".bundle"
-		commitBundlePath := p.store.FullPath(filepath.Join(projectID, commit))
-		http.ServeFile(rw, r, filepath.Join(commitBundlePath, commitBundle))
+
 	}
+
+	unzippedPath := p.store.FullPath(filepath.Join(projectID, "unzip"))
+	commitBundle := existingProject.Name + ".bundle"
+	commitBundlePath := p.store.FullPath(filepath.Join(projectID, commit))
+
+	err = p.store.Checkout(unzippedPath, commitBundlePath, commit, projectID, project.Name)
+	if err != nil {
+		p.l.WithFields(
+			logrus.Fields{
+				"projectID": projectID,
+				"commit":    commit,
+				"error":     err,
+			}).Error("Unable to checkout")
+		return
+	}
+
+	project = domain.NewProject(uuid.MustParse(projectID), commit, project.Name, unzippedPath, filepath.Join(commitBundlePath, commitBundle))
+	p.l.WithFields(
+		logrus.Fields{
+			"projectID": projectID,
+			"commit":    commit,
+		}).Info("Saving to db")
+	p.db.AddProject(project)
+
+	rw.Header().Set("Content-type", "application/octet-stream")
+	rw.Header().Set("Content-Disposition", "attachment; filename=\""+project.Name+".bundle\"")
+	http.ServeFile(rw, r, project.ZippedPath)
 
 }
 
@@ -227,11 +250,11 @@ func (p *Projects) save(id, projectName string, r io.ReadCloser, commit string) 
 		return
 	}
 
-	project := domain.NewProject(uuid.MustParse(id), commit, projectName, unzippedPath, filepath.Join(commitZipPath, commitZip))
-	p.l.WithFields(logrus.Fields{
-		"projectID":   id,
-		"commit":      commit,
-		"projectName": projectName,
-	}).Info("Saving project to db")
-	p.db.AddProject(project)
+	// project := domain.NewProject(uuid.MustParse(id), commit, projectName, unzippedPath, filepath.Join(commitZipPath, commitZip))
+	// p.l.WithFields(logrus.Fields{
+	// 	"projectID":   id,
+	// 	"commit":      commit,
+	// 	"projectName": projectName,
+	// }).Info("Saving project to db")
+	// p.db.AddProject(project)
 }
