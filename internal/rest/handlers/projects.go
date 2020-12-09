@@ -129,8 +129,9 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 		}
 		rw.Header().Set("Content-type", "application/octet-stream")
 		rw.Header().Set("Content-Disposition", "attachment; filename=\""+project.Name+".bundle\"")
-		p.l.WithField("path", project.ZippedPath).Info("Zipped path")
-		http.ServeFile(rw, r, project.ZippedPath)
+		commitBundle := existingProject.Name + ".bundle"
+		commitBundlePath := p.store.FullPath(filepath.Join(projectID, commit))
+		http.ServeFile(rw, r, filepath.Join(commitBundlePath, commitBundle))
 	}
 
 }
