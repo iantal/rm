@@ -127,12 +127,12 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 			rw.WriteHeader(http.StatusInternalServerError)
 			util.ToJSON(&GenericError{Message: "Could not download project"}, rw)
 		}
+		rw.Header().Set("Content-type", "application/octet-stream")
+		rw.Header().Set("Content-Disposition", "attachment; filename=\""+project.Name+".bundle\"")
+		p.l.WithField("path", project.ZippedPath).Info("Zipped path")
+		http.ServeFile(rw, r, project.ZippedPath)
 	}
 
-	rw.Header().Set("Content-type", "application/octet-stream")
-	rw.Header().Set("Content-Disposition", "attachment; filename=\""+project.Name+".bundle\"")
-	p.l.WithField("path", project.ZippedPath).Info("Zipped path")
-	http.ServeFile(rw, r, project.ZippedPath)
 }
 
 func (p *Projects) getProjectName(projectID string) (*domain.Project, error) {
