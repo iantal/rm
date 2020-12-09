@@ -77,7 +77,7 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 				logrus.Fields{
 					"projectID": projectID,
 					"commit":    commit,
-					"error": err,
+					"error":     err,
 				}).Error("Unable to checkout")
 			return
 		}
@@ -131,6 +131,7 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 
 	rw.Header().Set("Content-type", "application/octet-stream")
 	rw.Header().Set("Content-Disposition", "attachment; filename=\""+project.Name+".bundle\"")
+	p.l.WithField("path", project.ZippedPath).Info("Zipped path")
 	http.ServeFile(rw, r, project.ZippedPath)
 }
 
