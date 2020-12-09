@@ -237,7 +237,6 @@ func (p *Projects) save(id, projectName string, r io.ReadCloser, commit string) 
 
 	os.RemoveAll(filepath.Join(id, "zip"))
 
-	commitZip := projectName + ".bundle"
 	commitZipPath := p.store.FullPath(filepath.Join(id, commit))
 
 	err = p.store.Checkout(unzippedPath, commitZipPath, commit, id, projectName)
