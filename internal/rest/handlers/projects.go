@@ -16,6 +16,7 @@ import (
 	"github.com/iantal/rm/internal/repository"
 	"github.com/iantal/rm/internal/util"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/xerrors"
 )
 
 // Projects is a handler for reading and writing projects to a storage and db
@@ -46,9 +47,56 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 	projectID := vars["id"]
 	commit := vars["commit"]
 
-	p.l.WithField("projectID", projectID).Info("Downloading")
+	if project := p.getProjectForCommit(projectID, commit); project != nil {
+		rw.Header().Set("Content-type", "application/octet-stream")
+		rw.Header().Set("Content-Disposition", "attachment; filename=\""+project.Name+".bundle\"")
+		http.ServeFile(rw, r, project.BundlePath)
+		return
+	}
 
-	// return the bundle for commit if exists
+	if project := p.checkoutCommitForProject(commit, projectID); project != nil {
+		rw.Header().Set("Content-type", "application/octet-stream")
+		rw.Header().Set("Content-Disposition", "attachment; filename=\""+project.Name+".bundle\"")
+		http.ServeFile(rw, r, project.BundlePath)
+		return
+	}
+
+	p.l.WithField("projectID", projectID).Info("Downloading zip from rk")
+	projectName, zipPath, err := p.downloadZip(projectID)
+	if err != nil {
+		p.l.WithFields(logrus.Fields{
+			"projectID": projectID,
+			"error":     err,
+		}).Error("Could not download zip")
+		rw.WriteHeader(http.StatusInternalServerError)
+		util.ToJSON(&GenericError{Message: "Project not found"}, rw)
+	}
+
+	zipFile := projectName + ".zip"
+	downloadedZip := p.store.FullPath(filepath.Join(zipPath, zipFile))
+	err = p.extractZip(downloadedZip, projectID, projectName)
+	if err != nil {
+		p.l.WithFields(logrus.Fields{
+			"projectID": projectID,
+			"error":     err,
+		}).Error("Unable to unzip file")
+		rw.WriteHeader(http.StatusInternalServerError)
+		util.ToJSON(&GenericError{Message: "Project not found"}, rw)
+	}
+
+	if project := p.checkoutCommitForProject(commit, projectID); project != nil {
+		rw.Header().Set("Content-type", "application/octet-stream")
+		rw.Header().Set("Content-Disposition", "attachment; filename=\""+project.Name+".bundle\"")
+		http.ServeFile(rw, r, project.BundlePath)
+	} else {
+		rw.WriteHeader(http.StatusInternalServerError)
+		util.ToJSON(&GenericError{Message: "Project not found"}, rw)
+	}
+
+}
+
+// Gets the project from db for a given commit or nil if not found
+func (p *Projects) getProjectForCommit(projectID, commit string) *domain.Project {
 	existingProject := p.db.GetProjectByIDAndCommit(projectID, commit)
 	if existingProject != nil && existingProject.Name != "" {
 		p.l.WithFields(
@@ -56,85 +104,27 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 				"projectID":   existingProject.ProjectID,
 				"projectName": existingProject.Name,
 				"commit":      existingProject.CommitHash,
-				"zipPath":     existingProject.ZippedPath,
+				"zipPath":     existingProject.BundlePath,
 			}).Info("Project with commit found")
-		rw.Header().Set("Content-type", "application/octet-stream")
-		rw.Header().Set("Content-Disposition", "attachment; filename=\""+existingProject.Name+".bundle\"")
-		http.ServeFile(rw, r, existingProject.ZippedPath)
-		return
+		return existingProject
 	}
+	return nil
+}
 
-	// checkout new commit if project is downloaded
-	existingProject = p.db.GetProjectByID(projectID)
-	if existingProject != nil && existingProject.UnzipedPath != "" {
-		p.l.WithField("projectID", projectID).Info("Project found")
-		commitBundle := existingProject.Name + ".bundle"
-		commitBundlePath := p.store.FullPath(filepath.Join(projectID, commit))
+// Checks out the commit for a given project if the project was already downloaded from rk or nil if not found
+func (p *Projects) checkoutCommitForProject(commit, projectID string) *domain.Project {
+	existingProject := p.db.GetProjectByID(projectID)
 
-		err := p.store.Checkout(existingProject.UnzipedPath, commitBundlePath, commit, existingProject.ProjectID.String(), existingProject.Name)
-		if err != nil {
-			p.l.WithFields(
-				logrus.Fields{
-					"projectID": projectID,
-					"commit":    commit,
-					"error":     err,
-				}).Error("Unable to checkout")
-			return
-		}
-
-		project := domain.NewProject(uuid.MustParse(projectID), commit, existingProject.Name, existingProject.UnzipedPath, filepath.Join(commitBundlePath, commitBundle))
-		p.l.WithFields(
-			logrus.Fields{
-				"projectID": projectID,
-				"commit":    commit,
-			}).Debug("Saving to db")
-		p.db.AddProject(project)
-
-		rw.Header().Set("Content-type", "application/octet-stream")
-		rw.Header().Set("Content-Disposition", "attachment; filename=\""+project.Name+".bundle\"")
-		http.ServeFile(rw, r, existingProject.ZippedPath)
-		return
-	}
-
-	p.l.WithFields(logrus.Fields{
-		"projectID": projectID,
-		"commit":    commit,
-	}).Info("Getting project name from rk")
-	// get projectName from rk
-	project, err := p.getProjectName(projectID)
-	if err != nil {
+	if existingProject == nil || existingProject.UnzippedPath == "" {
 		p.l.WithFields(logrus.Fields{
-			"projectID": projectID,
+			"projectId": projectID,
 			"commit":    commit,
-			"error":     err,
-		}).Error("Could not get project name")
-		rw.WriteHeader(http.StatusInternalServerError)
-		util.ToJSON(&GenericError{Message: "Project not found"}, rw)
-		return
+		}).Info("Project is not downloaded or unzipped yet")
+		return nil
 	}
 
-	p.l.Info("Downloading project")
-	// download the project from rk
-	projectPath := filepath.Join(p.store.FullPath(projectID), "zip")
-	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
-		err = p.downloadRepository(project, commit)
-		if err != nil {
-			p.l.WithFields(logrus.Fields{
-				"projectID": projectID,
-				"commit":    commit,
-				"error":     err,
-			}).Error("Could not download zip from rk for project")
-			rw.WriteHeader(http.StatusInternalServerError)
-			util.ToJSON(&GenericError{Message: "Could not download project"}, rw)
-		}
-
-	}
-
-	unzippedPath := p.store.FullPath(filepath.Join(projectID, "unzip"))
-	commitBundle := existingProject.Name + ".bundle"
 	commitBundlePath := p.store.FullPath(filepath.Join(projectID, commit))
-
-	err = p.store.Checkout(unzippedPath, commitBundlePath, commit, projectID, project.Name)
+	err := p.store.Checkout(existingProject.UnzippedPath, commitBundlePath, commit, projectID, existingProject.Name)
 	if err != nil {
 		p.l.WithFields(
 			logrus.Fields{
@@ -142,21 +132,47 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 				"commit":    commit,
 				"error":     err,
 			}).Error("Unable to checkout")
-		return
+		return nil
 	}
 
-	project = domain.NewProject(uuid.MustParse(projectID), commit, project.Name, unzippedPath, filepath.Join(commitBundlePath, commitBundle))
+	unzippedPath := p.store.FullPath(filepath.Join(projectID, "unzip"))
+	commitBundleFile := existingProject.Name + ".bundle"
+	bundleFilePath := filepath.Join(commitBundlePath, commitBundleFile)
+	project := domain.NewProject(uuid.MustParse(projectID), commit, existingProject.Name, unzippedPath, bundleFilePath)
 	p.l.WithFields(
 		logrus.Fields{
 			"projectID": projectID,
 			"commit":    commit,
-		}).Info("Saving to db")
+		}).Debug("Saving to db")
 	p.db.AddProject(project)
+	return project
+}
 
-	rw.Header().Set("Content-type", "application/octet-stream")
-	rw.Header().Set("Content-Disposition", "attachment; filename=\""+project.Name+".bundle\"")
-	http.ServeFile(rw, r, project.ZippedPath)
+func (p *Projects) downloadZip(projectID string) (string, string, error) {
+	p.l.WithField("projectId", projectID).Info("Getting project name from rk")
 
+	// get projectName from rk
+	project, err := p.getProjectName(projectID)
+	if err != nil {
+		return "", "", xerrors.Errorf("Could not get project name", err)
+	}
+
+	projectZipPath := filepath.Join(p.store.FullPath(projectID), "zip")
+	if _, err := os.Stat(projectZipPath); os.IsNotExist(err) {
+		projectID := project.ProjectID.String()
+		resp, err := http.DefaultClient.Get("http://" + p.rkHost + "/api/v1/projects/" + projectID + "/download")
+		if err != nil {
+			return "", "", err
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return "", "", fmt.Errorf("Expected error code 200 got %d", resp.StatusCode)
+		}
+
+		p.saveZip(projectID, project.Name, resp.Body)
+		resp.Body.Close()
+	}
+	return project.Name, projectZipPath, nil
 }
 
 func (p *Projects) getProjectName(projectID string) (*domain.Project, error) {
@@ -183,29 +199,8 @@ func (p *Projects) getProjectName(projectID string) (*domain.Project, error) {
 	return project, nil
 }
 
-func (p *Projects) downloadRepository(project *domain.Project, commit string) error {
-	projectID := project.ProjectID.String()
-	resp, err := http.DefaultClient.Get("http://" + p.rkHost + "/api/v1/projects/" + projectID + "/download")
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Expected error code 200 got %d", resp.StatusCode)
-	}
-
-	p.save(projectID, project.Name, resp.Body, commit)
-	resp.Body.Close()
-
-	return nil
-}
-
-func (p *Projects) save(id, projectName string, r io.ReadCloser, commit string) {
-	p.l.WithFields(logrus.Fields{
-		"projectID": id,
-		"commit":    commit,
-	}).Info("Saving project to storage")
-	unzippedPath := p.store.FullPath(filepath.Join(id, "unzip"))
+func (p *Projects) saveZip(id, projectName string, r io.ReadCloser) {
+	p.l.WithField("projectID", id).Info("Saving project to storage")
 
 	zipFile := projectName + ".zip"
 	tempZip := p.store.FullPath(filepath.Join(id, "zip", zipFile))
@@ -214,46 +209,23 @@ func (p *Projects) save(id, projectName string, r io.ReadCloser, commit string) 
 	if err != nil {
 		p.l.WithFields(logrus.Fields{
 			"projectID": id,
-			"commit":    commit,
 			"error":     err,
-		}).Error("Unable to save file")
+		}).Error("Unable to save zip")
 		return
 	}
+}
 
+func (p *Projects) extractZip(zipFile, projectID, projectName string) error {
 	p.l.WithFields(logrus.Fields{
-		"projectID": id,
-		"commit":    commit,
-		"path":      filepath.Join(id, "unzip"),
+		"projectID": projectID,
+		"path":      filepath.Join(projectID, "unzip"),
 	}).Info("Unzipping")
-	err = p.store.Unzip(tempZip, p.store.FullPath(filepath.Join(id, "unzip")), projectName)
+
+	err := p.store.Unzip(zipFile, p.store.FullPath(filepath.Join(projectID, "unzip")), projectName)
 	if err != nil {
-		p.l.WithFields(logrus.Fields{
-			"projectID": id,
-			"commit":    commit,
-			"error":     err,
-		}).Error("Unable to unzip file")
-		return
+		return err
 	}
 
-	os.RemoveAll(filepath.Join(id, "zip"))
-
-	commitZipPath := p.store.FullPath(filepath.Join(id, commit))
-
-	err = p.store.Checkout(unzippedPath, commitZipPath, commit, id, projectName)
-	if err != nil {
-		p.l.WithFields(logrus.Fields{
-			"projectID": id,
-			"commit":    commit,
-			"error":     err,
-		}).Error("Unable to checkout")
-		return
-	}
-
-	// project := domain.NewProject(uuid.MustParse(id), commit, projectName, unzippedPath, filepath.Join(commitZipPath, commitZip))
-	// p.l.WithFields(logrus.Fields{
-	// 	"projectID":   id,
-	// 	"commit":      commit,
-	// 	"projectName": projectName,
-	// }).Info("Saving project to db")
-	// p.db.AddProject(project)
+	os.RemoveAll(filepath.Join(projectID, "zip"))
+	return nil
 }
