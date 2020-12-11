@@ -78,6 +78,7 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		p.l.WithFields(logrus.Fields{
 			"projectID": projectID,
+			"zipPath": downloadedZip,
 			"error":     err,
 		}).Error("Unable to unzip file")
 		rw.WriteHeader(http.StatusInternalServerError)
