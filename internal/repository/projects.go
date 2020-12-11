@@ -30,7 +30,7 @@ func (p *ProjectDB) AddProject(project *domain.Project) {
 
 func (p *ProjectDB) UpdateProject(project *domain.Project) {
 	ep := &domain.Project{}
-	p.db.Find(&ep, "project_id = ? and commit_hash", project.ProjectID, project.CommitHash)
+	p.db.Find(&ep, "project_id = ? and commit_hash = ?", project.ProjectID, project.CommitHash)
 
 	if ep != nil {
 		p.db.Save(&ep)
