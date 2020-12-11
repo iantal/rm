@@ -74,16 +74,19 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 
 	zipFile := projectName + ".zip"
 	downloadedZip := filepath.Join(zipPath, zipFile)
-	err = p.extractZip(downloadedZip, projectID, projectName)
+	unzipPath, err := p.extractZip(downloadedZip, projectID, projectName)
 	if err != nil {
 		p.l.WithFields(logrus.Fields{
 			"projectID": projectID,
-			"zipPath": downloadedZip,
+			"zipPath":   downloadedZip,
 			"error":     err,
 		}).Error("Unable to unzip file")
 		rw.WriteHeader(http.StatusInternalServerError)
 		util.ToJSON(&GenericError{Message: "Project not found"}, rw)
 	}
+
+	project := domain.NewProject(uuid.MustParse(projectID), commit, projectName, unzipPath, "")
+	p.db.AddProject(project)
 
 	if project := p.checkoutCommitForProject(commit, projectID); project != nil {
 		rw.Header().Set("Content-type", "application/octet-stream")
@@ -216,17 +219,18 @@ func (p *Projects) saveZip(id, projectName string, r io.ReadCloser) {
 	}
 }
 
-func (p *Projects) extractZip(zipFile, projectID, projectName string) error {
+func (p *Projects) extractZip(zipFile, projectID, projectName string) (string, error) {
 	p.l.WithFields(logrus.Fields{
 		"projectID": projectID,
 		"path":      filepath.Join(projectID, "unzip"),
 	}).Info("Unzipping")
 
-	err := p.store.Unzip(zipFile, p.store.FullPath(filepath.Join(projectID, "unzip")), projectName)
+	unzipPath := p.store.FullPath(filepath.Join(projectID, "unzip"))
+	err := p.store.Unzip(zipFile, unzipPath, projectName)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	os.RemoveAll(filepath.Join(projectID, "zip"))
-	return nil
+	return unzipPath, nil
 }
