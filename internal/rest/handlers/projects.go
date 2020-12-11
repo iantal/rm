@@ -148,7 +148,7 @@ func (p *Projects) checkoutCommitForProject(commit, projectID string) *domain.Pr
 			"projectID": projectID,
 			"commit":    commit,
 		}).Debug("Saving to db")
-	p.db.AddProject(project)
+	p.db.UpdateProject(project)
 	return project
 }
 

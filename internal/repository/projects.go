@@ -28,6 +28,17 @@ func (p *ProjectDB) AddProject(project *domain.Project) {
 	return
 }
 
+func (p *ProjectDB) UpdateProject(project *domain.Project) {
+	ep := &domain.Project{}
+	p.db.Find(&ep, "project_id = ? and commit_hash", project.ProjectID, project.CommitHash)
+
+	if ep != nil {
+		p.db.Save(&ep)
+	} else {
+		p.AddProject(project)
+	}
+}
+
 // GetProjects returns all existing projects in the db
 func (p *ProjectDB) GetProjects() ([]*domain.Project, error) {
 	var projects []*domain.Project
