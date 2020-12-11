@@ -73,7 +73,7 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	zipFile := projectName + ".zip"
-	downloadedZip := p.store.FullPath(filepath.Join(zipPath, zipFile))
+	downloadedZip := filepath.Join(zipPath, zipFile)
 	err = p.extractZip(downloadedZip, projectID, projectName)
 	if err != nil {
 		p.l.WithFields(logrus.Fields{
