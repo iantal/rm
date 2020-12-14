@@ -20,23 +20,22 @@ func (r *RepositoryManager) IsDownloaded(projectID, projectName string) bool {
 	return true
 }
 
-func (r *RepositoryManager) DownloadZip(projectID, projectName string) error {
-	r.l.WithField("projectId", projectID).Info("Getting project name from rk")
-
+func (r *RepositoryManager) DownloadZip(projectID, projectName string) (string, error) {
 	if !r.IsDownloaded(projectID, projectName) {
+		r.l.WithField("projectId", projectID).Info("Getting project name from rk")
 		resp, err := http.DefaultClient.Get("http://" + r.rkHost + "/api/v1/projects/" + projectID + "/download")
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("Expected error code 200 got %d", resp.StatusCode)
+			return "", fmt.Errorf("Expected error code 200 got %d", resp.StatusCode)
 		}
 
 		r.saveZip(projectID, projectName, resp.Body)
 		resp.Body.Close()
 	}
-	return nil
+	return r.store.ZipFilePath(projectID, projectName), nil
 }
 
 func (r *RepositoryManager) GetProjectName(projectID string) (string, error) {

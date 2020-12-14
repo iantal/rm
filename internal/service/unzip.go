@@ -4,7 +4,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (r *RepositoryManager) ExtractZip(zipFile, projectID, projectName string) (string, error) {
+func (r *RepositoryManager) ExtractZip(zipFile, projectID, projectName string) error {
 	r.l.WithFields(logrus.Fields{
 		"projectID": projectID,
 		"ZipFile":   zipFile,
@@ -13,8 +13,8 @@ func (r *RepositoryManager) ExtractZip(zipFile, projectID, projectName string) (
 	unzipPath := r.store.UnzipPath(projectID)
 	err := r.store.Unzip(zipFile, unzipPath, projectName)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	return unzipPath, nil
+	return nil
 }

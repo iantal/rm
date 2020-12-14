@@ -80,7 +80,7 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. not downloaded => download from rk
-	err = p.repositoryManager.DownloadZip(projectID, projectName)
+	zipFile, err := p.repositoryManager.DownloadZip(projectID, projectName)
 	if err != nil {
 		p.l.WithFields(logrus.Fields{
 			"projectID": projectID,
@@ -91,7 +91,19 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. checkout commit
+	// 3. unzip
+	err = p.repositoryManager.ExtractZip(zipFile, projectID, projectName)
+	if err != nil {
+		p.l.WithFields(logrus.Fields{
+			"projectID": projectID,
+			"error":     err,
+		}).Error("Cannot extract zip file")
+		rw.WriteHeader(http.StatusInternalServerError)
+		util.ToJSON(&GenericError{Message: "Project not found"}, rw)
+		return
+	}
+
+	// 4. checkout commit
 	err = p.repositoryManager.CheckoutCommit(commit, projectID, projectName)
 	if err != nil {
 		p.l.WithFields(
@@ -105,6 +117,7 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 		util.ToJSON(&GenericError{Message: "Project not found"}, rw)
 		return
 	}
+	
 	project := p.repositoryManager.SaveToDb(projectName, projectID, commit)
 	rw.Header().Set("Content-type", "application/octet-stream")
 	rw.Header().Set("Content-Disposition", "attachment; filename=\""+project.Name+".bundle\"")
