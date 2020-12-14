@@ -19,7 +19,7 @@ spec:
         - name: dockerregistrykey
       containers:
         - name: rm
-          image: micky0000/seclens:v1.1.8-rm
+          image: micky0000/seclens:v1.1.9-rm
           imagePullPolicy: "Always"
           ports:
             - containerPort: 8005
