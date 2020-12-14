@@ -55,6 +55,7 @@ func (p *ProjectDB) GetProjectByID(id string) *domain.Project {
 		return nil
 	}
 	p.db.Find(&project, "project_id = ?", uid)
+	p.log.WithField("project", project).Info("Found project")
 	return project
 }
 
@@ -63,9 +64,10 @@ func (p *ProjectDB) GetProjectByIDAndCommit(id, commit string) *domain.Project {
 	project := &domain.Project{}
 	uid, err := uuid.Parse(id)
 	if err != nil {
-		p.log.Error("Project with projectId {} was not found")
+		p.log.WithField("uuid", id).Error("Cannot parse uuid")
 		return nil
 	}
 	p.db.Where("project_id = ? AND commit_hash = ?", uid, commit).Find(&project)
+	p.log.WithField("project", project).Info("Found project and commit")
 	return project
 }

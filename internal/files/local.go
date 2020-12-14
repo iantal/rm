@@ -31,6 +31,34 @@ func NewLocal(l *util.StandardLogger, basePath string, maxSize int) (*Local, err
 	return &Local{l, maxSize, p}, nil
 }
 
+// FullPath returns the absolute path
+func (l *Local) FullPath(path string) string {
+	// append the given path to the base path
+	return filepath.Join(l.basePath, path)
+}
+
+func (l *Local) ProjectPath(projectID string) string {
+	return filepath.Join(l.basePath, projectID)
+}
+
+func (l *Local) CommitPath(projectID, commit string) string {
+	return filepath.Join(l.basePath, projectID, commit)
+}
+
+func (l *Local) BundleFilePath(projectID, commit, projectName string) string {
+	bundleFile := projectName + ".bundle"
+	return filepath.Join(l.basePath, projectID, commit, bundleFile)
+}
+
+func (l *Local) ZipFilePath(projectID, projectName string) string {
+	zipFile := projectName + ".zip"
+	return filepath.Join(l.basePath, projectID, "zip", zipFile)
+}
+
+func (l *Local) UnzipPath(projectID string) string {
+	return filepath.Join(l.basePath, projectID, "unzip")
+}
+
 // Save the contents of the Writer to the given path
 // path is a relative path, basePath will be appended
 func (l *Local) Save(fp string, contents io.Reader) error {
@@ -83,12 +111,6 @@ func (l *Local) Get(path string) (*os.File, error) {
 	}
 
 	return f, nil
-}
-
-// FullPath returns the absolute path
-func (l *Local) FullPath(path string) string {
-	// append the given path to the base path
-	return filepath.Join(l.basePath, path)
 }
 
 // Unzip uses the unzip command line tool to extract the project to the specified target directory
