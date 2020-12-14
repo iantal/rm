@@ -68,6 +68,10 @@ func (p *ProjectDB) GetProjectByIDAndCommit(id, commit string) *domain.Project {
 		return nil
 	}
 	p.db.Where("project_id = ? AND commit_hash = ?", uid, commit).Find(&project)
-	p.log.WithField("project", project).Info("Found project and commit")
-	return project
+
+	if project.ProjectID.String() == id && project.CommitHash == commit {
+		p.log.WithField("project", project).Info("Found project and commit")
+		return project
+	}
+	return nil
 }
