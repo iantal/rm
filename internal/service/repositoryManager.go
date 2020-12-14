@@ -28,6 +28,7 @@ func NewRepositoryManager(log *util.StandardLogger, store files.Storage, db *rep
 // Gets the project from db for a given commit and projectId or nil if not found
 func (r *RepositoryManager) GetProjectForCommit(projectID, commit string) *domain.Project {
 	existingProject := r.db.GetProjectByIDAndCommit(projectID, commit)
+	r.l.WithField("existingProject", existingProject).Info("Existing project")
 	if existingProject != nil && existingProject.BundlePath != "" {
 		r.l.WithFields(
 			logrus.Fields{

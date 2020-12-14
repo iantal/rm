@@ -15,6 +15,10 @@ import (
 func (r *RepositoryManager) IsDownloaded(projectID, projectName string) bool {
 	zipPath := r.store.ZipFilePath(projectID, projectName)
 	if _, err := os.Stat(zipPath); os.IsNotExist(err) {
+		r.l.WithFields(logrus.Fields{
+			"projectID": projectID,
+			"zipFile": zipPath,	
+		}).Info("Zip not found")
 		return false
 	}
 	return true
