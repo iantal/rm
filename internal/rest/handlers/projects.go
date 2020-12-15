@@ -20,7 +20,6 @@ type Projects struct {
 // NewProjects creates a handler for projects
 func NewProjects(log *util.StandardLogger, store files.Storage, db *repository.ProjectDB, rkHost string) *Projects {
 	rm := service.NewRepositoryManager(log, store, db, rkHost)
-
 	return &Projects{
 		l:                 log,
 		repositoryManager: rm,
@@ -32,6 +31,7 @@ type GenericError struct {
 	Message string `json:"message"`
 }
 
+// Download handles the download process for a specific commit and provides the .bundle file as response or an error message
 func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	projectID := vars["id"]
@@ -57,8 +57,17 @@ func (p *Projects) Download(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	p.l.WithFields(logrus.Fields{
+		"projectID": projectID,
+		"projectName": projectName,
+	}).Info("Project name obtained from rk")
+
 	// 1. is downloaded, just checkout the commit
 	if p.repositoryManager.IsDownloaded(projectID, projectName) {
+		p.l.WithFields(logrus.Fields{
+			"projectId": projectID,
+			"projectName": projectName,
+		}).Info("Performing checkout on already downloaded project")
 		err = p.repositoryManager.CheckoutCommit(commit, projectID, projectName)
 		if err != nil {
 			p.l.WithFields(
