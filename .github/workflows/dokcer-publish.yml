@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - name: Set env
+      run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
     - uses: mr-smithers-excellent/docker-build-push@v4
       name: Build & push Docker image
       with:
@@ -17,3 +19,9 @@ jobs:
         dockerfile: docker/Dockerfile
         username: ${{ secrets.DOCKER_USER }}
         password: ${{ secrets.DOCKER_PASS }}
+    - uses: DamianReeves/write-file-action
+      with:
+        path: k8s/rm/values.yaml
+        contents: |
+          echo $GITHUB_ENV
+        write-mode: overwrite
