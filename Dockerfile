@@ -24,7 +24,6 @@ FROM golang:alpine as deploy
 COPY --from=builder /dist .
 
 RUN apk update && apk add wget && apk add bash && apk add zip && apk add git
-RUN wget https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh && chmod +x wait-for-it.sh
 
 RUN git config --global user.email "test@rm.com" && git config --global user.name "testrm"
 

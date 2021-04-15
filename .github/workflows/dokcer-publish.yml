@@ -16,7 +16,7 @@ jobs:
       with:
         image: micky0000/seclens
         registry: docker.io
-        dockerfile: docker/Dockerfile
+        dockerfile: Dockerfile
         username: ${{ secrets.DOCKER_USER }}
         password: ${{ secrets.DOCKER_PASS }}
     - uses: DamianReeves/write-file-action
