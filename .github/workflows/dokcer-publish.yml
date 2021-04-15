@@ -19,9 +19,4 @@ jobs:
         dockerfile: Dockerfile
         username: ${{ secrets.DOCKER_USER }}
         password: ${{ secrets.DOCKER_PASS }}
-    - uses: DamianReeves/write-file-action
-      with:
-        path: k8s/rm/values.yaml
-        contents: |
-          echo $GITHUB_ENV
-        write-mode: overwrite
+    
